@@ -1,0 +1,403 @@
+{
+	"info": {
+		"_postman_id": "7d4ca305-6d99-4abc-9a06-bf1080d9894a",
+		"name": "Partner Center (Microsoft APIs)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. User+App Authentication ARM",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "4d0f6f19-48db-47ad-928c-83b288198dbc",
+						"type": "text/javascript",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"postman.setEnvironmentVariable(\"ACCESS_TOKEN_ARM\",jsonData.access_token);"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/x-www-form-urlencoded"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "resource",
+							"value": "https://management.core.windows.net/",
+							"type": "text",
+							"description": ""
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text",
+							"description": ""
+						},
+						{
+							"key": "username",
+							"value": "{{PC_USER}}",
+							"type": "text",
+							"description": ""
+						},
+						{
+							"key": "password",
+							"value": "{{PC_USER_PWD}}",
+							"type": "text",
+							"description": ""
+						},
+						{
+							"key": "scope",
+							"value": "openid",
+							"type": "text",
+							"description": ""
+						},
+						{
+							"key": "client_id",
+							"value": "{{PC_CLIENT_ID}}",
+							"type": "text",
+							"description": ""
+						}
+					]
+				},
+				"url": {
+					"raw": "https://login.microsoftonline.com/{{PC_CUSTOMER_DOMAIN}}/oauth2/token",
+					"protocol": "https",
+					"host": [
+						"login",
+						"microsoftonline",
+						"com"
+					],
+					"path": [
+						"{{PC_CUSTOMER_DOMAIN}}",
+						"oauth2",
+						"token"
+					]
+				},
+				"description": "Partner Center Token using native App Id + partner center user credentials"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Azure Subscriptions",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "4326c981-ca56-45e5-be3e-c0cdb42f831f",
+						"type": "text/javascript",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"postman.setEnvironmentVariable(\"AZURE_SUBS_ID\",jsonData.value[0].subscriptionId);"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions?api-version=2015-07-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2015-07-01"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2.1 Create ResourceGroup",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n     \"location\": \"West Europe\",\r\n     \"tags\": {\r\n        \"department\": \"dev\"\r\n     }\r\n   }\r\n\r\n"
+				},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups/{{RESOURCE_GROUP}}?api-version=2015-01-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups",
+						"{{RESOURCE_GROUP}}"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2015-01-01"
+						}
+					]
+				},
+				"description": "https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-template-deploy-rest#incremental-and-complete-deployments"
+			},
+			"response": []
+		},
+		{
+			"name": "2.2 Validate Deployment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"properties\": {\r\n       \"template\": {\r\n  \"$schema\": \"http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#\",\r\n  \"contentVersion\": \"1.0.0.0\",\r\n  \"parameters\": { \r\n    \"storageNamePrefix\": {\r\n    \"type\": \"string\",\r\n    \"maxLength\": 11,\r\n    \"defaultValue\": \"storage\",\r\n    \"metadata\": {\r\n      \"description\": \"The value to use for starting the storage account name.\"\r\n        }\r\n    },\r\n    \r\n    \"storageSKU\": {\r\n    \"type\": \"string\",\r\n    \"allowedValues\": [\r\n      \"Standard_LRS\",\r\n      \"Standard_ZRS\",\r\n      \"Standard_GRS\",\r\n      \"Standard_RAGRS\",\r\n      \"Premium_LRS\"\r\n    ],\r\n    \"defaultValue\": \"Standard_LRS\",\r\n    \"metadata\": {\r\n      \"description\": \"The type of replication to use for the storage account.\"\r\n    }\r\n  }\r\n\r\n   },\r\n  \"variables\": { \r\n      \"storageName\": \"[concat(parameters('storageNamePrefix'), uniqueString(resourceGroup().id))]\"\r\n },\r\n  \"resources\": [\r\n    {\r\n      \"name\": \"[variables('storageName')]\",\r\n      \"type\": \"Microsoft.Storage/storageAccounts\",\r\n      \"apiVersion\": \"2016-05-01\",\r\n      \"sku\": {\r\n        \"name\": \"Standard_LRS\"\r\n      },\r\n      \"kind\": \"Storage\",\r\n      \"location\": \"[resourceGroup().location]\",\r\n      \"tags\": {},\r\n      \"properties\": {\r\n      }\r\n    }\r\n  ],\r\n  \"outputs\": {  }\r\n       },\r\n       \"mode\": \"Incremental\",\r\n       \"parameters\": {      },\r\n       \"debugSetting\": {\r\n    \"detailLevel\": \"requestContent, responseContent\"\r\n    },\r\n   },\r\n  }\r\n\r\n"
+				},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups/{{RESOURCE_GROUP}}/providers/Microsoft.Resources/deployments/ArmDeployment/validate?api-version=2016-02-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups",
+						"{{RESOURCE_GROUP}}",
+						"providers",
+						"Microsoft.Resources",
+						"deployments",
+						"ArmDeployment",
+						"validate"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-02-01"
+						}
+					]
+				},
+				"description": "https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-template-deploy-rest#incremental-and-complete-deployments"
+			},
+			"response": []
+		},
+		{
+			"name": "2.3 Create Deployment",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n     \"properties\": {\r\n       \"template\": {\r\n  \"$schema\": \"http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#\",\r\n  \"contentVersion\": \"1.0.0.0\",\r\n  \"parameters\": { \r\n    \"storageNamePrefix\": {\r\n    \"type\": \"string\",\r\n    \"maxLength\": 11,\r\n    \"defaultValue\": \"storage\",\r\n    \"metadata\": {\r\n      \"description\": \"The value to use for starting the storage account name.\"\r\n        }\r\n    },\r\n    \r\n    \"storageSKU\": {\r\n    \"type\": \"string\",\r\n    \"allowedValues\": [\r\n      \"Standard_LRS\",\r\n      \"Standard_ZRS\",\r\n      \"Standard_GRS\",\r\n      \"Standard_RAGRS\",\r\n      \"Premium_LRS\"\r\n    ],\r\n    \"defaultValue\": \"Standard_LRS\",\r\n    \"metadata\": {\r\n      \"description\": \"The type of replication to use for the storage account.\"\r\n    }\r\n  }\r\n\r\n   },\r\n  \"variables\": { \r\n      \"storageName\": \"[concat(parameters('storageNamePrefix'), uniqueString(resourceGroup().id))]\"\r\n },\r\n  \"resources\": [\r\n    {\r\n      \"name\": \"[variables('storageName')]\",\r\n      \"type\": \"Microsoft.Storage/storageAccounts\",\r\n      \"apiVersion\": \"2016-05-01\",\r\n      \"sku\": {\r\n        \"name\": \"Standard_LRS\"\r\n      },\r\n      \"kind\": \"Storage\",\r\n      \"location\": \"[resourceGroup().location]\",\r\n      \"tags\": {},\r\n      \"properties\": {\r\n      }\r\n    }\r\n  ],\r\n  \"outputs\": {  }\r\n       },\r\n       \"mode\": \"Incremental\",\r\n       \"parameters\": {      },\r\n       \"debugSetting\": {\r\n    \"detailLevel\": \"requestContent, responseContent\"\r\n    }\r\n     }\r\n   }\r\n\r\n"
+				},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups/{{RESOURCE_GROUP}}/providers/Microsoft.Resources/deployments/ArmDeployment?api-version=2016-02-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups",
+						"{{RESOURCE_GROUP}}",
+						"providers",
+						"Microsoft.Resources",
+						"deployments",
+						"ArmDeployment"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-02-01"
+						}
+					]
+				},
+				"description": "https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-template-deploy-rest#incremental-and-complete-deployments"
+			},
+			"response": []
+		},
+		{
+			"name": "2.4 Get Deployment Status",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n     \"properties\": {\r\n       \"template\": {\r\n  \"$schema\": \"http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#\",\r\n  \"contentVersion\": \"1.0.0.0\",\r\n  \"parameters\": { \r\n    \"storageNamePrefix\": {\r\n    \"type\": \"string\",\r\n    \"maxLength\": 11,\r\n    \"defaultValue\": \"storage\",\r\n    \"metadata\": {\r\n      \"description\": \"The value to use for starting the storage account name.\"\r\n        }\r\n    },\r\n    \r\n    \"storageSKU\": {\r\n    \"type\": \"string\",\r\n    \"allowedValues\": [\r\n      \"Standard_LRS\",\r\n      \"Standard_ZRS\",\r\n      \"Standard_GRS\",\r\n      \"Standard_RAGRS\",\r\n      \"Premium_LRS\"\r\n    ],\r\n    \"defaultValue\": \"Standard_LRS\",\r\n    \"metadata\": {\r\n      \"description\": \"The type of replication to use for the storage account.\"\r\n    }\r\n  }\r\n\r\n   },\r\n  \"variables\": { \r\n      \"storageName\": \"[concat(parameters('storageNamePrefix'), uniqueString(resourceGroup().id))]\"\r\n },\r\n  \"resources\": [\r\n    {\r\n      \"name\": \"[variables('storageName')]\",\r\n      \"type\": \"Microsoft.Storage/storageAccounts\",\r\n      \"apiVersion\": \"2016-05-01\",\r\n      \"sku\": {\r\n        \"name\": \"Standard_LRS\"\r\n      },\r\n      \"kind\": \"Storage\",\r\n      \"location\": \"[resourceGroup().location]\",\r\n      \"tags\": {},\r\n      \"properties\": {\r\n      }\r\n    }\r\n  ],\r\n  \"outputs\": {  }\r\n       },\r\n       \"mode\": \"Incremental\",\r\n       \"parameters\": {      },\r\n       \"debugSetting\": {\r\n    \"detailLevel\": \"requestContent, responseContent\"\r\n    }\r\n     }\r\n   }\r\n\r\n"
+				},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups/{{RESOURCE_GROUP}}/providers/Microsoft.Resources/deployments/ArmDeployment?api-version=2016-02-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups",
+						"{{RESOURCE_GROUP}}",
+						"providers",
+						"Microsoft.Resources",
+						"deployments",
+						"ArmDeployment"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-02-01"
+						}
+					]
+				},
+				"description": "https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-template-deploy-rest#incremental-and-complete-deployments"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Resource Groups in Subscription",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups?api-version=2016-09-01",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-09-01"
+						}
+					]
+				},
+				"description": "get resource groups descriptions "
+			},
+			"response": []
+		},
+		{
+			"name": "6. Delete Resource Group",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{ACCESS_TOKEN_ARM}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {},
+				"url": {
+					"raw": "https://management.azure.com/subscriptions/{{AZURE_SUBS_ID}}/resourcegroups/{{RESOURCE_GROUP}}?api-version=2017-05-10",
+					"protocol": "https",
+					"host": [
+						"management",
+						"azure",
+						"com"
+					],
+					"path": [
+						"subscriptions",
+						"{{AZURE_SUBS_ID}}",
+						"resourcegroups",
+						"{{RESOURCE_GROUP}}"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2017-05-10"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
